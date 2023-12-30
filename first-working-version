@@ -1,0 +1,65 @@
+# Import necessary libraries
+# These libraries provide essential tools for managing time, accessing pin definitions, reading digital pulses, and controlling haptic feedback motors.
+import time
+import board
+import digitalio
+import adafruit_drv2605
+
+# Configure HC-SR04 sensor pins
+# Define trigger and echo pins on the microcontroller to interface with the HC-SR04 ultrasonic sensor.
+trig_pin = board.D5  # The 'trig_pin' is set to D5, representing the trigger pin of the ultrasonic sensor.
+echo_pin = board.D6  # The 'echo_pin' is set to D6, representing the echo pin of the ultrasonic sensor.
+# Prepare to listen to the ultrasonic sensor's echo pin
+# We use the 'DigitalInOut' tool to listen for signals (high or low) coming from the echo pin.
+sonar = digitalio.DigitalInOut(echo_pin)
+#'sonar' is set up to tell us if the echo pin is sending a strong signal (high) or not (low).
+# This helps us measure distances because the sensor sends a signal, and 'sonar' lets us know when it comes back.
+
+# Set up the echo pin as an input
+# We are telling our sonar to listen attentively by setting the direction of the echo pin (D6) as 'INPUT'.
+sonar.direction = digitalio.Direction.INPUT
+# sonar is ready to notice any signals (changes from high to low or vice versa) coming from the echo pin.
+
+# Initialize I2C bus and DRV2605 module
+# Create an I2C communication bus and initialize the DRV2605 haptic feedback motor driver using that bus.
+i2c = board.I2C()  # 'i2c' is an I2C communication bus used for communication with the DRV2605.
+drv = adafruit_drv2605.DRV2605(i2c)  # 'drv' is an instance of the DRV2605 driver, enabling control over haptic feedback.
+
+# Configure digital output for trigger pin
+# Create a digital output object for the trigger pin and set it as an output. This pin is used to trigger the ultrasonic sensor.
+trig = digitalio.DigitalInOut(trig_pin)  # 'trig' is a digital output object created for the trigger pin.
+trig.direction = digitalio.Direction.OUTPUT  # The trigger pin is configured as an output.
+
+# Main loop for running haptic feedback when an object is within two feet
+# This loop continuously triggers the ultrasonic sensor to measure distance and activates haptic feedback if an object is within two feet.
+effect_id = 119  # 'effect_id' represents the feedback effect ID to be played by the haptic motor.
+while True:  # Infinite loop for continuous operation.
+
+    # Trigger the ultrasonic sensor to measure distance
+    trig.value = True  # Setting the trigger pin high initiates the ultrasonic sensor's pulse transmission.
+    time.sleep(0.001)  # A brief pause (1 millisecond) to allow the sensor's pulse to propagate.
+    trig.value = False  # Setting the trigger pin low stops the pulse transmission.
+
+    # Measure distance using the ultrasonic sensor
+    while sonar.value == False:  # Wait for the echo pin to go high.
+        pulse_start = time.monotonic()  # Record the start time before the echo pin goes high.
+    while sonar.value == True:  # Wait for the echo pin to go low.
+        pulse_end = time.monotonic()  # Record the end time before the echo pin goes low.
+
+    pulse_duration = pulse_end - pulse_start  # Calculate the duration of the pulse in seconds.
+    distance = (pulse_duration * 34300) / 2  # Use the pulse duration to calculate the distance in centimeters (speed of sound = 34300 cm/s).
+    print("Distance: {0} cm".format(distance))  # Print the measured distance.
+
+    # Check if the distance is within two feet
+    if (0 < distance < 60 or distance > 120):  # Check if the distance is within the specified range (0 to 60.96 cm).
+        # Trigger haptic feedback with the specified effect ID
+        print("Within two feet or 4 feet. Playing effect #{0}".format(effect_id))  # Display a message indicating the object is within two feet.
+        drv.sequence[0] = adafruit_drv2605.Effect(effect_id)  # Set the haptic feedback effect.
+        drv.play()  # Play the haptic feedback effect.
+        time.sleep(0.5)  # Wait for a short duration (0.5 seconds).
+        drv.stop()  # Stop the haptic feedback.
+
+    # Pause for 1 second before the next iteration
+    time.sleep(1)  # Wait for 1 second before taking the next distance measurement.
+
+
